@@ -1,0 +1,225 @@
+import React, { useEffect, useState } from 'react';
+
+// Sprachlern-App - Single-file React-Komponente
+// Tailwind CSS wird vorausgesetzt (kein Tailwind-Import hier)
+// Export default component at bottom
+
+const SAMPLE_COURSES = [
+  {
+    id: 'de-en',
+    title: 'Deutsch → Englisch (Anfänger)',
+    description: 'Grundwortschatz, einfache Sätze, Begrüßungen.',
+    lessons: [
+      {
+        id: 'greetings',
+        title: 'Begrüßungen',
+        type: 'vocab',
+        items: [
+          { q: 'Hallo', a: 'Hello' },
+          { q: 'Guten Morgen', a: 'Good morning' },
+          { q: 'Tschüss', a: 'Goodbye' }
+        ]
+      },
+      {
+        id: 'basic-phrases',
+        title: 'Grundsätze',
+        type: 'vocab',
+        items: [
+          { q: 'Wie geht\'s?', a: 'How are you?' },
+          { q: 'Danke', a: 'Thank you' },
+          { q: 'Bitte', a: 'Please / You\'re welcome' }
+        ]
+      }
+    ]
+  },
+  {
+    id: 'en-de',
+    title: 'English → Deutsch (Beginner)',
+    description: 'Basics for english speakers.',
+    lessons: [
+      {
+        id: 'intro',
+        title: 'Intro',
+        type: 'vocab',
+        items: [
+          { q: 'Hello', a: 'Hallo' },
+          { q: 'Goodbye', a: 'Tschüss' }
+        ]
+      }
+    ]
+  }
+];
+
+// utilities
+const uid = () => Math.random().toString(36).slice(2, 9);
+
+function useLocalStorage(key, initial) {
+  const [state, setState] = useState(() => {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : initial;
+    } catch (e) {
+      return initial;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(key, JSON.stringify(state));
+    } catch (e) {}
+  }, [key, state]);
+  return [state, setState];
+}
+
+// Tiny components
+function Header({ user, onNav }) {
+  return (
+    <header className="flex items-center justify-between p-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
+      <div className="flex items-center space-x-3">
+        <div className="font-bold text-xl">LinguaLite</div>
+        <div className="text-sm opacity-90">Lerne Sprachen spielerisch</div>
+      </div>
+      <nav className="flex items-center gap-3">
+        <button className="btn-link" onClick={() => onNav('home')}>Start</button>
+        <button className="btn-link" onClick={() => onNav('courses')}>Kurse</button>
+        <button className="btn-link" onClick={() => onNav('profile')}>Profil</button>
+        <div className="ml-3 bg-white/20 px-3 py-1 rounded">{user?.name || 'Gast'}</div>
+      </nav>
+    </header>
+  );
+}
+
+function Home({ onStart }) {
+  return (
+    <section className="p-6">
+      <div className="max-w-4xl mx-auto bg-white/80 rounded-2xl p-6 shadow">
+        <h1 className="text-3xl font-extrabold mb-2">Sprachen lernen — einfach & spielerisch</h1>
+        <p className="mb-4">Übe Vokabeln, wiederhole mit Karteikarten, sammle XP und halte deine Lernstreak am Leben.</p>
+        <div className="flex gap-4">
+          <button className="px-5 py-2 rounded bg-indigo-600 text-white font-semibold" onClick={() => onStart('courses')}>Kurse ansehen</button>
+          <button className="px-5 py-2 rounded border border-gray-300" onClick={() => onStart('practice')}>Sofort üben</button>
+        </div>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card title="Kurz & effektiv" body="5-15 Minuten Lektionen, täglich wiederholbar." />
+        <Card title="Gamification" body="Verdiene XP, erreiche Level und halte Streaks." />
+        <Card title="Offline-fähig" body="Fortschritt wird lokal gespeichert (Demo)." />
+      </div>
+    </section>
+  );
+}
+
+function Card({ title, body }) {
+  return (
+    <div className="p-4 bg-white rounded-lg shadow">
+      <h3 className="font-semibold mb-1">{title}</h3>
+      <p className="text-sm text-gray-600">{body}</p>
+    </div>
+  );
+}
+
+function Courses({ courses, onOpen }) {
+  return (
+    <section className="p-6">
+      <h2 className="text-2xl font-bold mb-4">Kurse</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {courses.map(c => (
+          <div key={c.id} className="p-4 border rounded-lg bg-white">
+            <h3 className="font-bold">{c.title}</h3>
+            <p className="text-sm text-gray-600 mb-3">{c.description}</p>
+            <button className="px-3 py-1 rounded bg-indigo-600 text-white" onClick={() => onOpen(c.id)}>Öffnen</button>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function CourseView({ course, onStartLesson }) {
+  if (!course) return null;
+  return (
+    <section className="p-6">
+      <div className="bg-white p-4 rounded-lg shadow">
+        <h2 className="text-2xl font-bold">{course.title}</h2>
+        <p className="text-sm text-gray-600 mb-4">{course.description}</p>
+        <div className="space-y-3">
+          {course.lessons.map(l => (
+            <div key={l.id} className="flex items-center justify-between p-3 border rounded">
+              <div>
+                <div className="font-semibold">{l.title}</div>
+                <div className="text-xs text-gray-500">{l.items.length} Items • {l.type}</div>
+              </div>
+              <button className="px-3 py-1 rounded bg-green-600 text-white" onClick={() => onStartLesson(course.id, l.id)}>Starten</button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function LessonView({ lesson, onFinish }) {
+  // simple flashcard flow
+  const [index, setIndex] = useState(0);
+  const [showAnswer, setShowAnswer] = useState(false);
+
+  if (!lesson) return null;
+  const item = lesson.items[index];
+
+  function next(correct = true) {
+    setShowAnswer(false);
+    const nextIndex = index + 1;
+    if (nextIndex >= lesson.items.length) {
+      onFinish && onFinish({ correctCount: 0 });
+    } else {
+      setIndex(nextIndex);
+    }
+  }
+
+  return (
+    <section className="p-6">
+      <div className="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow text-center">
+        <div className="text-sm text-gray-500 mb-2">{lesson.title}</div>
+        <div className="text-3xl font-bold mb-4">{item.q}</div>
+        {showAnswer ? (
+          <div className="mb-4 text-xl">{item.a}</div>
+        ) : (
+          <div className="mb-4 text-gray-500">Tippe auf "Antwort" um die Lösung zu sehen</div>
+        )}
+        <div className="flex gap-3 justify-center">
+          <button className="px-4 py-2 border rounded" onClick={() => setShowAnswer(true)}>Antwort</button>
+          <button className="px-4 py-2 bg-indigo-600 text-white rounded" onClick={() => next(true)}>Weiter</button>
+        </div>
+        <div className="mt-3 text-xs text-gray-400">Karte {index + 1} / {lesson.items.length}</div>
+      </div>
+    </section>
+  );
+}
+
+function Practice({ courses, onComplete }) {
+  // quick mixed practice across all vocab items
+  const pool = courses.flatMap(c => c.lessons.flatMap(l => l.items.map(it => ({ ...it, courseId: c.id }))));
+  const [shuffled] = useState(() => pool.sort(() => Math.random() - 0.5));
+  const [idx, setIdx] = useState(0);
+  const [show, setShow] = useState(false);
+
+  if (shuffled.length === 0) return <div className="p-6">Keine Inhalte.</div>;
+  const it = shuffled[idx];
+
+  function next() {
+    const n = idx + 1;
+    if (n >= shuffled.length) {
+      onComplete && onComplete();
+    } else setIdx(n);
+    setShow(false);
+  }
+
+  return (
+    <section className="p-6">
+      <div className="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow text-center">
+        <div className="text-sm text-gray-500 mb-2">Schnelles Üben</div>
+        <div className="text-3xl font-bold mb-4">{it.q}</div>
+        {show && <div className="mb-4 text-xl">{it.a}</div>}
+        <div className="flex gap-3 justify-center">
+          <button className="px-4 py-2 border rounded" onClick={() => setShow(true)}>Antwort</button>
+          <button className="px-4 py
