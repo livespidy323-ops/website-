@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Domino Arena</title>
+<style>
+:root{--bg:#10261e;--felt:#176044;--felt2:#1d7654;--gold:#f6c85f;--ink:#17231e}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#244f40,#08150f 70%);font-family:Inter,system-ui,sans-serif;color:#fff;min-height:100vh}
+.wrap{width:min(1200px,96vw);margin:auto;padding:18px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.brand{font-size:28px;font-weight:950}.brand span{color:var(--gold)}.stats{display:flex;gap:8px}.badge{background:#ffffff12;border:1px solid #ffffff20;padding:8px 12px;border-radius:12px}
+.board{margin-top:14px;background:linear-gradient(145deg,var(--felt),var(--felt2));border:8px solid #74481f;border-radius:24px;box-shadow:inset 0 0 50px #062c20,0 20px 50px #0006;min-height:540px;padding:18px;position:relative;overflow:hidden}
+.board:after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(45deg,#ffffff03 0 2px,transparent 2px 7px);pointer-events:none}
+.seat{position:absolute;background:#0b3327cc;border:1px solid #ffffff18;border-radius:14px;padding:8px 12px;text-align:center;z-index:3}.seat b{display:block}.you{bottom:12px;left:50%;transform:translateX(-50%)}.ai{top:12px;left:50%;transform:translateX(-50%)}.left{left:12px;top:50%;transform:translateY(-50%)}.right{right:12px;top:50%;transform:translateY(-50%)}
+.chain{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(760px,80vw);height:270px;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:6px;overflow:hidden;z-index:2}
+.tile{width:62px;height:34px;background:linear-gradient(#fff,#e8e5dc);border:2px solid #b9b5aa;border-radius:7px;color:#18201c;display:flex;align-items:center;justify-content:space-around;font-weight:900;box-shadow:0 3px 7px #0005;user-select:none}
+.tile.v{width:34px;height:62px;flex-direction:column}.dot{width:7px;height:7px;background:#18201c;border-radius:50%;display:inline-block}
+.hand{margin-top:14px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap}.hand .tile{cursor:pointer;width:72px;height:40px}.hand .tile:hover{transform:translateY(-7px)}.hand .tile.selected{outline:3px solid var(--gold);transform:translateY(-9px)}
+.actions{display:flex;justify-content:center;gap:9px;margin-top:12px;flex-wrap:wrap}button{border:0;border-radius:12px;padding:11px 17px;font-weight:900;cursor:pointer;background:var(--gold);color:#35260b}button.secondary{background:#ffffff15;color:#fff;border:1px solid #ffffff25}button:disabled{opacity:.35;cursor:not-allowed}
+.msg{text-align:center;min-height:28px;font-weight:800;color:#ffe8a7}.modal{position:fixed;inset:0;background:#0009;display:none;place-items:center;z-index:10}.card{background:#f8f5ed;color:var(--ink);padding:28px;border-radius:22px;text-align:center;width:min(430px,90vw);box-shadow:0 30px 80px #0008}.card h2{font-size:34px;margin:0 0 8px}
+@media(max-width:700px){.board{min-height:470px}.chain{width:72vw;height:230px}.tile{width:54px;height:30px}.left,.right{display:none}.seat{font-size:12px}.hand .tile{width:62px}}
+</style></head>
+<body>
+<div class="wrap">
+<div class="top"><div class="brand">🁣 <span>DOMINO</span> ARENA</div><div class="stats"><div class="badge">Runde: <b id="round">1</b></div><div class="badge">Du: <b id="wins">0</b> Siege</div><div class="badge">KI: <b id="aiwins">0</b> Siege</div></div></div>
+<div class="board">
+ <div class="seat ai">🤖 <b>Rico</b><small id="aicount">7 Steine</small></div>
+ <div class="seat you">😎 <b>Du</b><small id="count">7 Steine</small></div>
+ <div class="seat left">🦊 <b>Luna</b><small>bereit</small></div><div class="seat right">🐸 <b>Max</b><small>bereit</small></div>
+ <div id="chain" class="chain"></div>
+</div>
+<div id="msg" class="msg">Dein Zug! Wähle einen passenden Stein.</div>
+<div id="hand" class="hand"></div>
+<div class="actions"><button id="draw">Stapel ziehen</button><button id="pass" class="secondary">Passen</button><button id="new" class="secondary">Neue Runde</button></div>
+</div>
+<div class="modal" id="modal"><div class="card"><h2 id="title">🎉 Runde vorbei!</h2><p id="result"></p><button id="again">Nochmal spielen</button></div></div>
+<script>
+const handEl=document.getElementById('hand'),chainEl=document.getElementById('chain'),msg=document.getElementById('msg'),drawBtn=document.getElementById('draw'),passBtn=document.getElementById('pass');
+let deck=[],hand=[],ai=[],chain=[],turn='you',selected=null,round=1,wins=0,aiwins=0;
+const pipMap={0:[],1:[4],2:[2,6],3:[2,4,6],4:[1,2,6,7],5:[1,2,4,6,7],6:[1,2,3,5,6,7]};
+function tile(a,b){return {a,b}}
+function makeDeck(){let d=[];for(let a=0;a<=6;a++)for(let b=a;b<=6;b++)d.push(tile(a,b));return d.sort(()=>Math.random()-.5)}
+function dots(n){return pipMap[n].map(i=>'<i class="dot p'+i+'"></i>').join('')}
+function tileHTML(t,vertical=false){return '<div class="tile '+(vertical?'v':'')+'"><span>'+dots(t.a)+'</span><span>'+dots(t.b)+'</span></div>'}
+function render(){
+ handEl.innerHTML=hand.map((t,i)=>'<div class="tile '+(selected===i?'selected':'')+'" data-i="'+i+'"><span>'+dots(t.a)+'</span><span>'+dots(t.b)+'</span></div>').join('');
+ [...handEl.children].forEach(x=>x.onclick=()=>{selected=+x.dataset.i;render()});
+ chainEl.innerHTML=chain.map((t,i)=>tileHTML(t,i%4===0&&false)).join('');
+ document.getElementById('count').textContent=hand.length+' Steine';document.getElementById('aicount').textContent=ai.length+' Steine';
+ drawBtn.disabled=turn!=='you'||!deck.length;passBtn.disabled=turn!=='you';
+}
+function canPlay(t){if(!chain.length)return true;return t.a===chain[0].a||t.b===chain[0].a||t.a===chain.at(-1).b||t.b===chain.at(-1).b}
+function orient(t,end){
+ if(end==='left'){if(t.b===chain[0].a)return t;if(t.a===chain[0].a)return tile(t.b,t.a)}
+ else {if(t.a===chain.at(-1).b)return t;if(t.b===chain.at(-1).b)return tile(t.b,t.a)}
+ return null
+}
+function play(i,end='right'){
+ const t=hand[i];if(!canPlay(t)){msg.textContent='❌ Der Stein passt nicht.';return}
+ let o=t;
+ if(chain.length===0)chain=[t];else if(end==='left'){o=orient(t,'left');chain.unshift(o)}else{o=orient(t,'right');chain.push(o)}
+ hand.splice(i,1);selected=null;turn='ai';msg.textContent='🤖 Rico überlegt...';render();
+ if(!hand.length)return finish('you');setTimeout(aiTurn,650)
+}
+function aiTurn(){
+ let moves=ai.map((t,i)=>({t,i})).filter(x=>canPlay(x.t));
+ if(moves.length){let m=moves.sort((x,y)=>(y.t.a+y.t.b)-(x.t.a+x.t.b))[0];let t=m.t;
+   if(chain.length===0)chain=[t];else{let left=t.a===chain[0].a||t.b===chain[0].a;let o=orient(t,left?'left':'right');if(left)chain.unshift(o);else chain.push(o)}
+   ai.splice(m.i,1);msg.textContent='🤖 Rico hat gelegt. Dein Zug!'
+ }else if(deck.length){ai.push(deck.pop());msg.textContent='🤖 Rico zieht einen Stein.';setTimeout(aiTurn,400);return}
+ else {msg.textContent='🤖 Rico passt.'}
+ turn='you';render();if(!ai.length)finish('ai')
+}
+drawBtn.onclick=()=>{if(turn!=='you'||!deck.length)return;hand.push(deck.pop());msg.textContent='Du hast einen Stein gezogen.';render()}
+passBtn.onclick=()=>{if(turn!=='you')return;turn='ai';msg.textContent='Du passt.';render();setTimeout(aiTurn,500)}
+function finish(who){turn='over';if(who==='you'){wins++;document.getElementById('title').textContent='🏆 Du gewinnst!';document.getElementById('result').textContent='Sauber gespielt — alle deine Steine sind weg!'}else{aiwins++;document.getElementById('title').textContent='🤖 Rico gewinnt!';document.getElementById('result').textContent='Rico war diesmal schneller. Revanche?'}document.getElementById('wins').textContent=wins;document.getElementById('aiwins').textContent=aiwins;document.getElementById('modal').style.display='grid'}
+function start(){deck=makeDeck();hand=deck.splice(0,7);ai=deck.splice(0,7);chain=[];turn='you';selected=null;msg.textContent='Dein Zug! Wähle einen passenden Stein.';document.getElementById('round').textContent=round;document.getElementById('modal').style.display='none';render()}
+handEl.addEventListener('dblclick',e=>{let x=e.target.closest('[data-i]');if(x&&turn==='you')play(+x.dataset.i)})
+document.getElementById('new').onclick=()=>{round++;start()};document.getElementById('again').onclick=()=>{round++;start()};start();
+</script></body></html>
